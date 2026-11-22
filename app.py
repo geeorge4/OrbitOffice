@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 
 DATA = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'OrbitOffice'
 KINDS = {'write': 'Orbit Write', 'sheet': 'Orbit Calc', 'slides': 'Orbit Slides'}
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 
 def read_settings():
     try:
@@ -147,6 +147,10 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(); parser.add_argument('--kind',choices=KINDS,default='write')
     kind=parser.parse_args().kind
     api=Api(kind); root=Path(getattr(sys,'_MEIPASS',Path(__file__).parent))
+    # Feed the bundled page directly to WebView2. Navigating from an inline
+    # splash to a file:// URL can mis-handle the local path and fragment.
+    editor_html=(root/'index.html').read_text('utf-8')
+    editor_html=editor_html.replace('<script>','<script>window.ORBIT_KIND='+json.dumps(kind)+';',1)
 
     splash_html='''<!doctype html><meta charset="utf-8"><style>
     *{box-sizing:border-box}body{margin:0;background:#315bc6;color:white;font-family:Segoe UI,sans-serif;overflow:hidden;user-select:none}
@@ -165,6 +169,6 @@ if __name__=='__main__':
         loading[0]=False
         time.sleep(read_settings()['splash_seconds'])
         api._window.resize(1320,860)
-        api._window.load_url((root/'index.html').resolve().as_uri()+'#'+kind)
+        api._window.load_html(editor_html)
     api._window.events.loaded += reveal
     webview.start()
