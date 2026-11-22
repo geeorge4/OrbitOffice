@@ -9,7 +9,7 @@ from html.parser import HTMLParser
 
 DATA = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'OrbitOffice'
 KINDS = {'write': 'Orbit Write', 'sheet': 'Orbit Calc', 'slides': 'Orbit Slides'}
-VERSION = '1.1.1'
+VERSION = '1.1.2'
 
 def read_settings():
     try:
@@ -74,7 +74,13 @@ def export_file(path, state):
 
 class Api:
     def __init__(self,kind='write'):
-        self._window=None; self._kind=kind
+        self._window=None; self._kind=kind; self._maximized=False
+    def minimize(self):
+        self._window.minimize()
+    def toggle_maximize(self):
+        if self._maximized: self._window.restore()
+        else: self._window.maximize()
+        self._maximized=not self._maximized
     def config(self):
         return {'kind':self._kind,'settings':read_settings(),'version':VERSION}
     def settings(self,seconds):
@@ -159,10 +165,10 @@ if __name__=='__main__':
     .bottom{position:absolute;bottom:34px;left:45px;right:45px;font-size:12px;color:#d6e1ff}.track{height:16px;margin-top:12px;overflow:hidden;position:relative}.dot{position:absolute;left:0;top:5px;width:5px;height:5px;background:white;border-radius:50%;opacity:0;animation:fly 2.2s infinite;animation-timing-function:linear}.dot:nth-child(2){animation-delay:.13s}.dot:nth-child(3){animation-delay:.26s}.dot:nth-child(4){animation-delay:.39s}.dot:nth-child(5){animation-delay:.52s}
     .version{position:absolute;right:0;top:0;opacity:.6}button{position:absolute;right:12px;top:8px;border:0;background:none;color:#d6e1ff;font-size:21px;cursor:pointer}button:hover{color:white}
     @keyframes show{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes fly{0%{left:-3%;opacity:0}8%{opacity:1}25%{left:37%}65%{left:63%}86%{left:103%;opacity:1}87%,100%{left:103%;opacity:0}}
-    </style><main><button onclick="window.pywebview.api.close()" aria-label="Закрыть">×</button><div class="brand">ORBIT</div><div class="mark">◉</div><div class="title">Office</div><div class="bottom"><span>Подготовка редактора…</span><span class="version">1.1</span><div class="track" role="progressbar" aria-label="Загрузка"><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div></main>'''
+    </style><main><button onclick="window.pywebview.api.close()" aria-label="Закрыть">×</button><div class="brand pywebview-drag-region">ORBIT</div><div class="mark pywebview-drag-region">◉</div><div class="title pywebview-drag-region">Office</div><div class="bottom"><span>Подготовка редактора…</span><span class="version">1.1</span><div class="track" role="progressbar" aria-label="Загрузка"><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div></main>'''
     color={'write':'#315bc6','sheet':'#187b57','slides':'#bb4c30'}[kind]
-    splash_html=splash_html.replace('#315bc6',color).replace('<div class="title">Office</div>',f'<div class="title">{KINDS[kind].split()[1]}</div>')
-    api._window=webview.create_window(KINDS[kind],html=splash_html,js_api=api,width=520,height=380,resizable=True,background_color=color)
+    splash_html=splash_html.replace('#315bc6',color).replace('>Office</div>',f'>{KINDS[kind].split()[1]}</div>')
+    api._window=webview.create_window(KINDS[kind],html=splash_html,js_api=api,width=520,height=340,resizable=True,frameless=True,easy_drag=False,background_color=color)
     loading=[True]
     def reveal():
         if not loading[0]: return
