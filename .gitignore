@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.spec
+*.lnk
+recovery*.json
+settings.json
+*.orbit
+*.tmp
+*.zip

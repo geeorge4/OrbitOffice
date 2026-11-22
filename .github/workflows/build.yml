@@ -1,0 +1,28 @@
+name: Build Orbit Office
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r requirements.txt
+      - shell: pwsh
+        run: ./build.ps1
+      - shell: pwsh
+        run: Compress-Archive -Path dist/* -DestinationPath Orbit-Office-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Orbit-Office-Windows
+          path: Orbit-Office-Windows.zip
+      - if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" Orbit-Office-Windows.zip --title "Orbit Office ${{ github.ref_name }}" --notes "Windows build. Separate Write, Calc and Slides windows. Configurable startup animation."
