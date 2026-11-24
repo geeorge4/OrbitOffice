@@ -1,4 +1,4 @@
-"""Orbit Office desktop. All documents stay on this computer."""
+"""KalibriOffice desktop. All documents stay on this computer."""
 import json
 import os
 import sys
@@ -8,8 +8,8 @@ from pathlib import Path
 from html.parser import HTMLParser
 
 DATA = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'OrbitOffice'
-KINDS = {'write': 'Orbit Write', 'sheet': 'Orbit Calc', 'slides': 'Orbit Slides'}
-VERSION = '1.1.2'
+KINDS = {'write': 'Kalibri Write', 'sheet': 'Kalibri Calc', 'slides': 'Kalibri Slides'}
+VERSION = '1.2.0'
 
 def read_settings():
     try:
@@ -57,6 +57,7 @@ def export_file(path, state):
                 except ValueError: pass
             s[address]=value
             s[address].font=Font(name='Calibri',size=11)
+            s[address].number_format={'number':'0.00','percent':'0.00%','currency':'#,##0.00 "₽"'}.get(state.get('formats',{}).get(address),'General')
         for col in range(1,27): s.column_dimensions[chr(64+col)].width=16
         w.save(path)
     else:
@@ -70,6 +71,7 @@ def export_file(path, state):
                 box=s.shapes.add_textbox(Inches(1),Inches(y), Inches(11), Inches(3)).text_frame
                 box.word_wrap=True; box.text=text
                 for para in box.paragraphs: para.font.size=Pt(size); para.font.color.rgb=RGBColor(255,255,255)
+            if item.get('notes'): s.notes_slide.notes_text_frame.text=item['notes']
         p.save(path)
 
 class Api:
@@ -136,13 +138,20 @@ class Api:
             from openpyxl import load_workbook
             wb=load_workbook(path); s=wb.active
             if s.max_row>100 or s.max_column>26: raise ValueError('В первой версии поддерживается до 100 строк и 26 столбцов. Исходный файл не изменён.')
-            return dict(kind='sheet',name=path.stem,cells={c.coordinate:str(c.value) for row in s for c in row if c.value is not None})
+            formats={}
+            for row in s:
+                for c in row:
+                    if '%' in c.number_format: formats[c.coordinate]='percent'
+                    elif '₽' in c.number_format: formats[c.coordinate]='currency'
+                    elif c.number_format=='0.00': formats[c.coordinate]='number'
+            return dict(kind='sheet',name=path.stem,cells={c.coordinate:str(c.value) for row in s for c in row if c.value is not None},formats=formats)
         if ext=='.pptx':
             from pptx import Presentation
             slides=[]
             for s in Presentation(path).slides:
                 texts=[sh.text for sh in s.shapes if sh.has_text_frame]
-                slides.append(dict(title=texts[0] if texts else '',body='\n'.join(texts[1:]),color='#234c75'))
+                notes=s.notes_slide.notes_text_frame.text if s.has_notes_slide else ''
+                slides.append(dict(title=texts[0] if texts else '',body='\n'.join(texts[1:]),color='#234c75',notes=notes))
             return dict(kind='slides',name=path.stem,slides=slides or [dict(title='',body='',color='#234c75')])
         raise ValueError('Этот формат пока не поддерживается.')
 
@@ -156,6 +165,7 @@ if __name__=='__main__':
     # Feed the bundled page directly to WebView2. Navigating from an inline
     # splash to a file:// URL can mis-handle the local path and fragment.
     editor_html=(root/'index.html').read_text('utf-8')
+    editor_html=editor_html.replace('</html>','<script>'+(root/'features.js').read_text('utf-8')+'</script></html>')
     editor_html=editor_html.replace('<script>','<script>window.ORBIT_KIND='+json.dumps(kind)+';',1)
 
     splash_html='''<!doctype html><meta charset="utf-8"><style>
@@ -165,7 +175,7 @@ if __name__=='__main__':
     .bottom{position:absolute;bottom:34px;left:45px;right:45px;font-size:12px;color:#d6e1ff}.track{height:16px;margin-top:12px;overflow:hidden;position:relative}.dot{position:absolute;left:0;top:5px;width:5px;height:5px;background:white;border-radius:50%;opacity:0;animation:fly 2.2s infinite;animation-timing-function:linear}.dot:nth-child(2){animation-delay:.13s}.dot:nth-child(3){animation-delay:.26s}.dot:nth-child(4){animation-delay:.39s}.dot:nth-child(5){animation-delay:.52s}
     .version{position:absolute;right:0;top:0;opacity:.6}button{position:absolute;right:12px;top:8px;border:0;background:none;color:#d6e1ff;font-size:21px;cursor:pointer}button:hover{color:white}
     @keyframes show{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes fly{0%{left:-3%;opacity:0}8%{opacity:1}25%{left:37%}65%{left:63%}86%{left:103%;opacity:1}87%,100%{left:103%;opacity:0}}
-    </style><main><button onclick="window.pywebview.api.close()" aria-label="Закрыть">×</button><div class="brand pywebview-drag-region">ORBIT</div><div class="mark pywebview-drag-region">◉</div><div class="title pywebview-drag-region">Office</div><div class="bottom"><span>Подготовка редактора…</span><span class="version">1.1</span><div class="track" role="progressbar" aria-label="Загрузка"><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div></main>'''
+    </style><main><button onclick="window.pywebview.api.close()" aria-label="Закрыть">×</button><div class="brand pywebview-drag-region">KALIBRI</div><div class="mark pywebview-drag-region">◉</div><div class="title pywebview-drag-region">Office</div><div class="bottom"><span>Подготовка редактора…</span><span class="version">1.2</span><div class="track" role="progressbar" aria-label="Загрузка"><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div></div></main>'''
     color={'write':'#315bc6','sheet':'#187b57','slides':'#bb4c30'}[kind]
     splash_html=splash_html.replace('#315bc6',color).replace('>Office</div>',f'>{KINDS[kind].split()[1]}</div>')
     api._window=webview.create_window(KINDS[kind],html=splash_html,js_api=api,width=520,height=340,resizable=True,frameless=True,easy_drag=False,background_color=color)
